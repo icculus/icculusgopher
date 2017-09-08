@@ -1,0 +1,4 @@
+#!/bin/sh
+# Version of IcculusGopher. Change this if you are forking the code.
+VERSION='0.0.1'
+echo -n "i$VERSION\t\terror.host\t1\r\n"

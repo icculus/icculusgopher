@@ -30,9 +30,6 @@ use warnings;        # don't touch this line, either.
 use IO::Select;      # bleh.
 use POSIX;           # bloop.
 
-# Version of IcculusGopher. Change this if you are forking the code.
-my $version = 'v0.0.1';
-
 #-----------------------------------------------------------------------------#
 #             CONFIGURATION VARIABLES: Change to suit your needs...           #
 #-----------------------------------------------------------------------------#
@@ -175,20 +172,16 @@ sub gopher_mainline {
         $program = undef if $program eq '~';
         $program = 'default' if not defined $program or $program eq '';
 
-        if ($program eq 'version') {
-            send_gopher_menu('i', $version);
-	} else {
-            my $exe = "$gopherspace/$program";
-            if ( -f $exe ) { 
-                $ENV{'GOPHERSPACE'} = $gopherspace;
-                $ENV{'GOPHERHOST'} = $gopherhost;
-                $ENV{'GOPHERPORT'} = $gopherport;
-                { exec $exe, $args; };
-                syslog("info", "Failed to execute '$exe': $!");
-            }
-            send_gopher_menu('3', $no_report_string);
-            return 1;
+        my $exe = "$gopherspace/$program";
+        if ( -f $exe ) { 
+            $ENV{'GOPHERSPACE'} = $gopherspace;
+            $ENV{'GOPHERHOST'} = $gopherhost;
+            $ENV{'GOPHERPORT'} = $gopherport;
+            { exec $exe, $args; };
+            syslog("info", "Failed to execute '$exe': $!");
         }
+        send_gopher_menu('3', $no_report_string);
+        return 1;
     }
 
     return 0;
@@ -291,7 +284,7 @@ if (not $daemonize) {
 # The daemon.
 
 if ($use_syslog) {
-    syslog("info", "IcculusGopher daemon $version starting up...");
+    syslog("info", "IcculusGopher daemon starting up...");
 }
 
 go_to_background();
