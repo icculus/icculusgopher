@@ -1,0 +1,39 @@
+#!/usr/bin/perl -w -T
+
+use warnings;
+use strict;
+
+sub send_gopher_menu {
+    my ($itemtype, $str, $selector, $host, $port) = @_;
+    $itemtype = 'i' if not defined $itemtype;
+    $str = '' if not defined $str;
+    $selector = '' if not defined $selector;
+    $host = 'error.host' if not defined $host;
+    $port = 1 if not defined $port;
+    print("$itemtype$str\t$selector\t$host\t$port\r\n");
+}
+
+sub send_gopher_info {
+    my $str = shift;
+    send_gopher_menu('i', $str);
+}
+
+send_gopher_info('Here are some things you can try here:');
+send_gopher_info('');
+
+my $seen = 0;
+my $gopherspace = $ENV{'GOPHERSPACE'};
+if (opendir(my $dh, $gopherspace)) {
+    while (readdir($dh)) {
+         my $f = "$gopherspace/$_";
+        next if not -f $f;
+        next if not -x $f;
+        next if $_ eq 'default';
+        send_gopher_menu('1', $_, $_, $ENV{'GOPHERHOST'}, $ENV{'GOPHERPORT'});
+        $seen = 1;
+    }
+    closedir($dh);
+}
+
+send_gopher_info("   ...nothing, apparently!") if !$seen;
+
