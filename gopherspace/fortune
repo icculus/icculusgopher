@@ -1,0 +1,21 @@
+#!/usr/bin/perl -w
+
+use strict;
+use warnings;
+
+sub gopher_info {
+    my $str = shift;
+    print("i$str\t\terror.host\t1\r\n");
+}
+
+my @lines = split /^/m, `/usr/games/fortune`;
+gopher_info('');
+gopher_info('');
+foreach (@lines) {
+    chomp;
+    s/\t/    /g;
+    gopher_info($_);
+}
+gopher_info('');
+gopher_info('');
+
