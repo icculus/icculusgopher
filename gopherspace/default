@@ -35,5 +35,5 @@ if (opendir(my $dh, $gopherspace)) {
     closedir($dh);
 }
 
-send_gopher_info("   ...nothing, apparently!") if !$seen;
+send_gopher_menu(3, '   ...nothing, apparently!') if !$seen;
 

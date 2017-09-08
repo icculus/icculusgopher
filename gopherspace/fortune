@@ -3,19 +3,34 @@
 use strict;
 use warnings;
 
-sub gopher_info {
+sub send_gopher_menu {
+    my ($itemtype, $str, $selector, $host, $port) = @_;
+    $itemtype = 'i' if not defined $itemtype;
+    $str = '' if not defined $str;
+    $selector = '' if not defined $selector;
+    $host = 'error.host' if not defined $host;
+    $port = 1 if not defined $port;
+    print("$itemtype$str\t$selector\t$host\t$port\r\n");
+}
+
+sub send_gopher_info {
     my $str = shift;
-    print("i$str\t\terror.host\t1\r\n");
+    send_gopher_menu('i', $str);
 }
 
 my @lines = split /^/m, `/usr/games/fortune`;
-gopher_info('');
-gopher_info('');
+if (scalar(@lines) == 0) {
+     send_gopher_menu('3', "Uhoh, fortune process didn't work out. Sorry!");
+     exit(1);
+}
+
+send_gopher_info('');
+send_gopher_info('');
 foreach (@lines) {
     chomp;
     s/\t/    /g;
-    gopher_info($_);
+    send_gopher_info($_);
 }
-gopher_info('');
-gopher_info('');
+send_gopher_info('');
+send_gopher_info('');
 

@@ -186,7 +186,7 @@ sub gopher_mainline {
                 { exec $exe, $args; };
                 syslog("info", "Failed to execute '$exe': $!");
             }
-            send_gopher_menu('i', $no_report_string);
+            send_gopher_menu('3', $no_report_string);
             return 1;
         }
     }
