@@ -1,21 +1,27 @@
 #!/usr/bin/perl -w -T
 #-----------------------------------------------------------------------------
 #
-#  Copyright (C) 2017 Ryan C. Gordon (icculus@icculus.org)
+#  Copyright (c) 2017 Ryan C. Gordon.
 #
-#  This program is free software; you can redistribute it and/or modify
-#  it under the terms of the GNU General Public License as published by
-#  the Free Software Foundation; either version 2 of the License, or
-#  (at your option) any later version.
+#  This software is provided 'as-is', without any express or implied warranty.
+#  In no event will the authors be held liable for any damages arising from
+#  the use of this software.
 #
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
+#  Permission is granted to anyone to use this software for any purpose,
+#  including commercial applications, and to alter it and redistribute it
+#  freely, subject to the following restrictions:
 #
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
+#  1. The origin of this software must not be misrepresented; you must not
+#  claim that you wrote the original software. If you use this software in a
+#  product, an acknowledgment in the product documentation would be
+#  appreciated but is not required.
+#
+#  2. Altered source versions must be plainly marked as such, and must not be
+#  misrepresented as being the original software.
+#
+#  3. This notice may not be removed or altered from any source distribution.
+#
+#      Ryan C. Gordon <icculus@icculus.org>
 #
 #-----------------------------------------------------------------------------
 
@@ -25,7 +31,7 @@ use IO::Select;      # bleh.
 use POSIX;           # bloop.
 
 # Version of IcculusGopher. Change this if you are forking the code.
-my $version = 'v2.1.27';
+my $version = 'v0.0.1';
 
 #-----------------------------------------------------------------------------#
 #             CONFIGURATION VARIABLES: Change to suit your needs...           #
@@ -38,6 +44,15 @@ my $safe_path = '/usr/bin:/usr/local/bin';
 # This is the directory that contains the handler programs.
 my $gopherspace = '/gopherspace/';
 
+# This is the hostname that clients should use to connect to this server.
+my $gopherhost = 'gopher.icculus.org';
+
+# This is the TCP port that clients should use to connect to this server.
+# This is mostly used when daemonized. Specify the port on which to listen for
+#  incoming connections. The RFC standard Gopher port is 70.
+my $gopherport = 70;
+
+
 # Turn the process into a daemon. This will handle creating/answering socket
 #  connections, and forking off children to handle them. This flag can be
 #  toggled via command line options (--daemonize, --no-daemonize, -d), but
@@ -48,10 +63,6 @@ my $gopherspace = '/gopherspace/';
 #  stdout, which makes it suitable for command line use or execution from
 #  inetd and equivalents.
 my $daemonize = 0;
-
-# This is only used when daemonized. Specify the port on which to listen for
-#  incoming connections. The RFC standard Gopher port is 70.
-my $server_port = 70;
 
 # Set this to immediately drop priveledges by setting uid and gid to these
 #  values. Set to undef to not attempt to drop privs. You will probably need
@@ -92,9 +103,6 @@ my $max_request_size = 1024;
 
 # This is what is reported to the Gopher client if a request is bogus.
 my $no_report_string = "Nothing to report.";
-
-# You can screw up your output with this, if you like.
-my $debug = 0;
 
 #-----------------------------------------------------------------------------#
 #     The rest is probably okay without you laying yer dirty mits on it.      #
@@ -161,14 +169,26 @@ sub gopher_mainline {
             syslog("info", $syslog_text) or die("Couldn't write to syslog: $!\n");
         }
 
-        my ($program, $sep, $args) = $query_string =~ /\A(.*?)(\/|\Z).*)\Z/;
+        my ($program, $sep, $args) = $query_string =~ /\A(.*?)(\/|\Z)(.*)\Z/;
         $program = undef if $program eq '.';
         $program = undef if $program eq '..';
         $program = undef if $program eq '~';
         $program = 'default' if not defined $program or $program eq '';
-        exec "$gopherspace/$program", $args
-        send_gopher_menu('i', $no_report_string);
-        return 1;
+
+        if ($program eq 'version') {
+            send_gopher_menu('i', $version);
+	} else {
+            my $exe = "$gopherspace/$program";
+            if ( -f $exe ) { 
+                $ENV{'GOPHERSPACE'} = $gopherspace;
+                $ENV{'GOPHERHOST'} = $gopherhost;
+                $ENV{'GOPHERPORT'} = $gopherport;
+                { exec $exe, $args; };
+                syslog("info", "Failed to execute '$exe': $!");
+            }
+            send_gopher_menu('i', $no_report_string);
+            return 1;
+        }
     }
 
     return 0;
@@ -283,7 +303,7 @@ $SIG{INT} = \&signal_catcher;
 
 use IO::Socket::IP;
 my $listensock = IO::Socket::IP->new(LocalHost => '::',
-			               LocalPort => $server_port,
+			               LocalPort => $gopherport,
                                        Type => SOCK_STREAM,
                                        ReuseAddr => 1,
                                        Listen => $max_connects);
@@ -295,7 +315,7 @@ drop_privileges();
 
 if ($use_syslog) {
     syslog("info", "Now accepting connections (max $max_connects" .
-                    " simultaneous on port $server_port).");
+                    " simultaneous on port $gopherport).");
 }
 
 while (1)
@@ -330,9 +350,9 @@ while (1)
         $ENV{'TCPREMOTEIP'} = $ip;
         close($listensock);   # child has no use for listen socket.
         local *FH = $client;
-        open(STDIN, "<&FH") or syslog_and_die("no STDIN reassign: $!");
-        open(STDERR, ">&FH") or syslog_and_die("no STDERR reassign: $!");
-        open(STDOUT, ">&FH") or syslog_and_die("no STDOUT reassign: $!");
+        open(STDIN, '<&', *FH) or syslog_and_die("no STDIN reassign: $!");
+        open(STDERR, '>&', *FH) or syslog_and_die("no STDERR reassign: $!");
+        open(STDOUT, '>&', *FH) or syslog_and_die("no STDOUT reassign: $!");
         my $retval = gopher_mainline();
         close($client);
         exit $retval;  # kill child.
