@@ -1,0 +1,234 @@
+#!/usr/bin/perl -w
+
+use strict;
+use warnings;
+use Net::Twitter;
+use LWP::Simple;
+use Text::Unidecode;
+#use Data::Dumper;
+
+binmode STDOUT, ':utf8';
+
+my $consumer_key = 'sdlfkslkflsdkf';
+my $consumer_secret = 'sdflksdfsdlfksdlf';
+my $token = '234124-sfksjdkfjsdkf9sdfsfk';
+my $token_secret = 'sd9f8s9dfjs9dfj';
+
+my $api = undef;
+
+sub getapi {
+    return 1 if (defined $api);
+    eval {
+        $api = Net::Twitter->new(
+            traits   => [qw/API::RESTv1_1/],
+            consumer_key        => $consumer_key,
+            consumer_secret     => $consumer_secret,
+            access_token        => $token,
+            access_token_secret => $token_secret,
+        );
+     };
+
+    if ($@) {
+        send_gopher_menu('3', "Couldn't authenticate with Twitter. Try again later.  :(");
+    }
+    return 1;
+}
+
+sub send_gopher_menu {
+    my ($itemtype, $str, $selector, $host, $port) = @_;
+    $itemtype = 'i' if not defined $itemtype;
+    $str = '' if not defined $str;
+    $selector = '' if not defined $selector;
+    $host = 'error.host' if not defined $host;
+    $port = 1 if not defined $port;
+    print("$itemtype$str\t$selector\t$host\t$port\r\n");
+}
+
+my $host = $ENV{'GOPHERHOST'};
+my $port = $ENV{'GOPHERPORT'};
+my $arg = shift @ARGV;
+
+my %commands = (
+    help => sub {
+        send_gopher_menu('i', 'This is a Twitter/Gopher bridge!');
+        send_gopher_menu('i');
+        send_gopher_menu('i', 'You can look up specific users with the twitter/user/$USERNAME selector...');
+        send_gopher_menu('1', 'Like what @icculus has tweeted recently.', 'twitter/user/icculus', $host, $port);
+        send_gopher_menu('i', '...or check out a specific tweet with the twitter/tweet/$ID selector...');
+        send_gopher_menu('1', 'Like the one that inspired these shenanigans.', 'twitter/tweet/905832029555744768', $host, $port);
+    },
+
+    tweet => sub {
+        my $params = shift;
+        my $tweet;
+        return if !getapi();
+        eval {
+            $tweet = $api->show_status({ id => $params, include_entities => 'true', tweet_mode => 'extended' });
+        };
+        if ($@) {
+            send_gopher_menu('3', "Couldn't load that tweet: " . $@->twitter_error_text);
+            send_gopher_menu('3', "If this is a temporary problem, try again later.");
+            return;
+        }
+
+        if ($tweet->{'user'}->{'protected'}) {
+            send_gopher_menu('3', "This Twitter account is private, sorry.");
+            return;
+        }
+
+        my $user = defined $tweet->{'user'}->{'screen_name'} ? $tweet->{'user'}->{'screen_name'} : '???';
+        my $text = defined $tweet->{'full_text'} ? $tweet->{'full_text'} : '[tweet is missing?!]';
+        my $created_at = defined $tweet->{'created_at'} ? $tweet->{'created_at'} : 'sometime in the past';
+        my $in_reply_to = $tweet->{'in_reply_to_status_id_str'};
+        my $retweets = defined $tweet->{'retweet_count'} ? $tweet->{'retweet_count'} : 0;
+        my $likes = defined $tweet->{'favorite_count'} ? $tweet->{'favorite_count'} : 0;
+
+        $text =~ s/[\t\r\n]/ /g;
+        #my $converter = Text::Iconv->new("UTF8", "LATIN1");
+        #$converter->set_attr("transliterate");
+        #$text = $converter->convert($text);
+        $text = unidecode($text);
+
+        send_gopher_menu('i', "\@$user - $created_at");
+        send_gopher_menu('i', $text);
+        send_gopher_menu('i');
+
+        if (defined $in_reply_to) {
+            my $in_reply_to_user = defined $tweet->{'in_reply_to_screen_name'} ? '@' . $tweet->{'in_reply_to_screen_name'} : 'someone';
+            send_gopher_menu('i');
+            send_gopher_menu('1', "In reply to $in_reply_to_user", "twitter/tweet/$in_reply_to", $host, $port);
+            send_gopher_menu('i');
+        }
+
+        if (defined $tweet->{'extended_entities'} and defined $tweet->{'extended_entities'}->{'media'}) {
+            my $imagenum = 0;
+            foreach my $media (@{$tweet->{'extended_entities'}->{'media'}}) {
+                next if $media->{'type'} ne 'photo';
+                $imagenum++;
+                my $idstr = $media->{'id_str'};
+                my $url = $media->{'media_url_https'};
+                $url =~ s/\A.*\.//;
+                $url =~ tr/A-Z/a-z/;
+                my $itemtype = 'I';
+                $itemtype = 'p' if ($url eq 'png');
+                $itemtype = 'g' if ($url eq 'gif');
+                send_gopher_menu($itemtype, "image $imagenum", "twitter/image/$params/$idstr.$url", $host, $port);
+            }
+        }
+
+        send_gopher_menu('i', "Retweets: $retweets");
+        send_gopher_menu('i', "Likes: $likes");
+        send_gopher_menu('1', "Other tweets by \@$user", "twitter/user/$user", $host, $port);
+    },
+
+    user => sub {
+        my $paramstr = shift;
+        my @params = split /\//, $paramstr;
+        my $user = shift @params;
+        my $with_replies = 0;
+        my $with_retweets = 0;
+	foreach (@params) {
+            $with_replies = 1, next if ($_ eq 'with_replies');
+            $with_replies = 0, next if ($_ eq 'without_replies');
+            $with_retweets = 1, next if ($_ eq 'with_retweets');
+            $with_retweets = 0, next if ($_ eq 'without_retweets');
+	}
+
+        return if !getapi();
+        my $tweets;
+        eval {
+            $tweets = $api->user_timeline({ screen_name => $user, count => 200, exclude_replies => !$with_replies, include_rts => $with_retweets, tweet_mode => 'extended' });
+        };
+        if ($@) {
+            send_gopher_menu('3', "Couldn't load user \@${user}'s timeline: " . $@->twitter_error_text);
+            send_gopher_menu('3', "If this is a temporary problem, try again later.");
+            return;
+        }
+
+        my $with_replies_str = $with_replies ? 'with_replies' : 'without_replies';
+        my $with_retweets_str = $with_retweets ? 'with_retweets' : 'without_retweets';
+
+        send_gopher_menu('i', "Latest tweets for \@$user...");
+        send_gopher_menu('i');
+
+        if ($with_replies) {
+            send_gopher_menu('1', 'Turn off replies.', "twitter/user/$user/without_replies/$with_retweets_str", $host, $port);
+        } else {
+            send_gopher_menu('1', 'Turn on replies.', "twitter/user/$user/with_replies/$with_retweets_str", $host, $port);
+        }
+
+        if ($with_retweets) {
+            send_gopher_menu('1', 'Turn off retweets.', "twitter/user/$user/$with_replies_str/without_retweets", $host, $port);
+        } else {
+            send_gopher_menu('1', 'Turn on retweets.', "twitter/user/$user/$with_replies_str/with_retweets", $host, $port);
+        }
+
+        foreach my $tweet (@$tweets) {
+            my $author = $tweet->{'user'}->{'screen_name'};
+            next if (defined $tweet->{'in_reply_to_status_id_str'} and not $with_replies);
+            next if ($author ne $user and not $with_retweets);
+            my $text = $tweet->{'full_text'};
+            $text =~ s/[\t\r\n]/ /g;
+            $text = unidecode($text);
+
+            my $idstr = defined $tweet->{'retweeted_status'} ? $tweet->{'retweeted_status'}->{'id_str'} : $tweet->{'id_str'};
+            send_gopher_menu('1', "\@${author}: $text", "twitter/tweet/$idstr", $host, $port);
+        }
+    },
+
+    image => sub {
+        # this has to exit() without any error report on problems because the client is expecting image data and can't eat an error string or the Patreon ad.
+        my $params = shift;
+        my $tweet;
+        my ($tweetid, $photoid) = $params =~ /\A(\d+)\/(\d+)\..*\Z/;
+        exit(1) if not defined $tweetid or not defined $photoid;
+        exit(1) if !getapi();
+        eval { $tweet = $api->show_status({ id => $tweetid, include_entities => 'true', tweet_mode => 'extended' }); };
+        exit(1) if ($@);
+        exit(1) if ($tweet->{'user'}->{'protected'});
+        exit(1) if (not defined $tweet->{'extended_entities'});
+        exit(1) if (not defined $tweet->{'extended_entities'}->{'media'});
+
+        foreach my $media (@{$tweet->{'extended_entities'}->{'media'}}) {
+            next if $media->{'type'} ne 'photo';
+            my $idstr = $media->{'id_str'};
+            next if $idstr ne $photoid;
+            my $url = $media->{'media_url_https'};
+            close(STDERR);
+            binmode STDOUT, ':raw';
+            getprint($url);
+            exit(0);
+        } 
+
+        exit(1);
+    }
+);
+
+sub send_patreon_plug {
+    send_gopher_menu('i');
+    send_gopher_menu('i');
+    send_gopher_menu('i', '-----------------------------------------------------------');
+    send_gopher_menu('i', "     This project was made possible by Ryan's Patreon:");
+    send_gopher_menu('i');
+    send_gopher_menu('i', "               https://patreon.com/icculus");
+    send_gopher_menu('i');
+    send_gopher_menu('i', "Your patronage makes fun stuff like this possible! Thanks!!");
+    send_gopher_menu('i', '-----------------------------------------------------------');
+    send_gopher_menu('i');
+    send_gopher_menu('i');
+}
+
+$arg = 'help' if (not defined $arg) or ($arg eq '');
+my ($cmd, $sep, $params) = $arg =~ /\A(.*?)(\/|\Z)(.*)\Z/;
+$cmd = 'help' if (not defined $cmd);
+
+if (not defined $commands{$cmd}) {
+    send_gopher_menu('3', "No such command as '$cmd'");
+    send_gopher_menu('i');
+    send_gopher_menu('i');
+    $cmd = 'help';
+}
+
+$commands{$cmd}->($params);
+send_patreon_plug();
+
