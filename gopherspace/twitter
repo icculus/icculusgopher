@@ -5,6 +5,7 @@ use warnings;
 use Net::Twitter;
 use LWP::Simple;
 use Text::Unidecode;
+use Text::Wrap;
 #use Data::Dumper;
 
 binmode STDOUT, ':utf8';
@@ -90,7 +91,14 @@ my %commands = (
         $text = unidecode($text);
 
         send_gopher_menu('i', "\@$user - $created_at");
-        send_gopher_menu('i', $text);
+        send_gopher_menu('i');
+
+        $Text::Wrap::columns = 72;
+        $text = wrap('', '', $text);
+        my @lines = split /^/, $text;
+        foreach (@lines) { chomp;
+            send_gopher_menu('i', $_);
+        }
         send_gopher_menu('i');
 
         if (defined $in_reply_to) {
@@ -162,6 +170,8 @@ my %commands = (
         } else {
             send_gopher_menu('1', 'Turn on retweets.', "twitter/user/$user/$with_replies_str/with_retweets", $host, $port);
         }
+
+        send_gopher_menu('i');
 
         foreach my $tweet (@$tweets) {
             my $author = $tweet->{'user'}->{'screen_name'};
