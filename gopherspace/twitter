@@ -93,7 +93,7 @@ my %commands = (
         send_gopher_menu('i', "\@$user - $created_at");
         send_gopher_menu('i');
 
-        $Text::Wrap::columns = 72;
+        $Text::Wrap::columns = 65;
         $text = wrap('', '', $text);
         my @lines = split /^/, $text;
         foreach (@lines) { chomp;
