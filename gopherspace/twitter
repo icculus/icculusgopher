@@ -53,9 +53,11 @@ my %commands = (
     help => sub {
         send_gopher_menu('i', 'This is a Twitter/Gopher bridge!');
         send_gopher_menu('i');
-        send_gopher_menu('i', 'You can look up specific users with the twitter/user/$USERNAME selector...');
+        send_gopher_menu('i', 'You can look up specific users with the');
+        send_gopher_menu('i', ' twitter/user/$USERNAME selector...');
         send_gopher_menu('1', 'Like what @icculus has tweeted recently.', 'twitter/user/icculus', $host, $port);
-        send_gopher_menu('i', '...or check out a specific tweet with the twitter/tweet/$ID selector...');
+        send_gopher_menu('i', '...or check out a specific tweet with the');
+        send_gopher_menu('i', ' twitter/tweet/$ID selector...');
         send_gopher_menu('1', 'Like the one that inspired these shenanigans.', 'twitter/tweet/905832029555744768', $host, $port);
     },
 
@@ -241,4 +243,6 @@ if (not defined $commands{$cmd}) {
 
 $commands{$cmd}->($params);
 send_patreon_plug();
+print(".\r\n");
+
 

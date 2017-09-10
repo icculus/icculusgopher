@@ -181,6 +181,7 @@ sub gopher_mainline {
             syslog("info", "Failed to execute '$exe': $!");
         }
         send_gopher_menu('3', $no_report_string);
+        print(".\r\n");
         return 1;
     }
 

@@ -34,3 +34,5 @@ foreach (@lines) {
 send_gopher_info('');
 send_gopher_info('');
 
+print(".\r\n");
+
