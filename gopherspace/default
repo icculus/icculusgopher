@@ -51,7 +51,7 @@ my $seen = 0;
 my $gopherspace = $ENV{'GOPHERSPACE'};
 if (opendir(my $dh, $gopherspace)) {
     while (readdir($dh)) {
-         my $f = "$gopherspace/$_";
+        my $f = "$gopherspace/$_";
         next if not -f $f;
         next if not -x $f;
         next if $_ eq 'default';
