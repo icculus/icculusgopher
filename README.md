@@ -45,7 +45,7 @@ asked for "music/pop/taylor_swift" then the daemon runs something like...
 export GOPHERSPACE=/gopherspace
 export GOPHERHOST=gopher.icculus.org
 export GOPHERPORT=70
-/gopherspace/music pop/taylor_swift
+/gopherspace/music/pop/taylor_swift
 ```
 
 ...and what the handler does is entirely up to it. Note that handlers are
