@@ -27,8 +27,8 @@
 #-----------------------------------------------------------------------------
 
 # Version of IcculusGopher. Change this if you are forking the code.
-VERSION='0.0.2'
+VERSION='0.0.3'
 echo -n "iThis is IcculusGopher $VERSION\t\terror.host\t1\r\n"
-echo -n "ihttps://hg.icculus.org/icculus/icculusgopher/\t\terror.host\t1\r\n"
+echo -n "ihttps://github.com/icculus/icculusgopher/\t\terror.host\t1\r\n"
 echo -n ".\r\n"
 
